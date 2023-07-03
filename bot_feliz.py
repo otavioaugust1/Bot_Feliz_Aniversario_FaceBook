@@ -61,27 +61,32 @@ frases = [
 "Parabéns, e muitos anos de vida! Que o dia seja generoso e cheio de alegria, paz e energia positiva."
 ]
 
-# Função para obter os amigos aniversariantes no dia atual
-def obter_amigos_aniversariantes():
-    today = datetime.date.today().strftime('%m-%d')
+# Função para obter os amigos aniversariantes na data específica
+def obter_amigos_aniversariantes(data):
     amigos = graph.get_connections("me", "friends", fields="birthday")
     aniversariantes = []
     for amigo in amigos["data"]:
-        if "birthday" in amigo and amigo["birthday"] == today:
-            aniversariantes.append(amigo)
+        if "birthday" in amigo:
+            amigo_birthday = amigo["birthday"].split('/')
+            if amigo_birthday[0] == data.split('-')[0] and amigo_birthday[1] == data.split('-')[1]:
+                aniversariantes.append(amigo)
     return aniversariantes
 
-# Função para postar mensagem de feliz aniversário na linha do tempo
-def postar_mensagem_aniversario(mensagem):
-    graph.put_object("me", "feed", message=mensagem)
+# Função para enviar mensagem direta de feliz aniversário04
+def enviar_mensagem_aniversario(amigo_id, amigo_nome, frase):
+    mensagem = f"Olá {amigo_nome}!\n\n{frase}"
+    graph.put_object(parent_object=amigo_id, connection_name='messages', message=mensagem)
+    print(f"Mensagem enviada para o amigo {amigo_nome} com ID {amigo_id}. Mensagem: {frase}")
 
-# Obtendo a lista de amigos aniversariantes
-amigos_aniversariantes = obter_amigos_aniversariantes()
+# Solicitar a data para a qual deseja enviar os desejos de feliz aniversário
+data_aniversario = input("Digite a data de aniversário (no formato DD-MM): ")
 
-# Percorrendo a lista de amigos aniversariantes e postando as mensagens de feliz aniversário
+# Obtendo a lista de amigos aniversariantes para a data especificada
+amigos_aniversariantes = obter_amigos_aniversariantes(data_aniversario)
+
+# Percorrendo a lista de amigos aniversariantes e enviando as mensagens de feliz aniversário
 for amigo in amigos_aniversariantes:
+    amigo_id = amigo["id"]
     amigo_nome = amigo["name"]
     frase_sorteada = random.choice(frases)
-    mensagem = f"Parabéns, {amigo_nome}! {frase_sorteada}"
-    postar_mensagem_aniversario(mensagem)
-    print(f"Mensagem enviada para {amigo_nome} na sua linha do tempo.")
+    enviar_mensagem_aniversario(amigo_id, amigo_nome, frase_sorteada)
