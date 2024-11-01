@@ -1,11 +1,12 @@
 # Importação das bibliotecas necessárias
 import random
-import facebook
-import random
 import datetime
+import facebook
+from facebook import GraphAPI
+import os
 
 # Token de acesso para autenticação na API do Facebook
-access_token = '' # Token de acesso
+access_token = os.getenv("FACEBOOK_ACCESS_TOKEN")  # Use uma variável de ambiente
 
 # Inicialização do objeto Graph da API do Facebook
 graph = facebook.GraphAPI(access_token)
@@ -61,32 +62,54 @@ frases = [
 "Parabéns, e muitos anos de vida! Que o dia seja generoso e cheio de alegria, paz e energia positiva."
 ]
 
-# Função para obter os amigos aniversariantes na data específica
-def obter_amigos_aniversariantes(data):
-    amigos = graph.get_connections("me", "friends", fields="birthday")
-    aniversariantes = []
-    for amigo in amigos["data"]:
-        if "birthday" in amigo:
-            amigo_birthday = amigo["birthday"].split('/')
-            if amigo_birthday[0] == data.split('-')[0] and amigo_birthday[1] == data.split('-')[1]:
-                aniversariantes.append(amigo)
-    return aniversariantes
+# Função para selecionar uma frase aleatória que não foi usada nas últimas 2 semanas
+def selecionar_frase(ultimas_frases):
+    frase = random.choice(frases)
+    while frase in ultimas_frases:
+        frase = random.choice(frases)
+    return frase
 
-# Função para enviar mensagem direta de feliz aniversário04
-def enviar_mensagem_aniversario(amigo_id, amigo_nome, frase):
-    mensagem = f"Olá {amigo_nome}!\n\n{frase}"
-    graph.put_object(parent_object=amigo_id, connection_name='messages', message=mensagem)
-    print(f"Mensagem enviada para o amigo {amigo_nome} com ID {amigo_id}. Mensagem: {frase}")
+# Função para postar a mensagem de aniversário no Facebook
+def postar_mensagem(api, amigo, mensagem):
+    try:
+        api.put_object(parent_object=amigo['id'], connection_name='feed', message=mensagem)
+    except Exception as e:
+        print(f"Erro ao postar mensagem para {amigo['name']}: {e}")
 
-# Solicitar a data para a qual deseja enviar os desejos de feliz aniversário
-data_aniversario = input("Digite a data de aniversário (no formato DD-MM): ")
+# Função principal
+def desejar_feliz_aniversario():
+    # Autenticação no Facebook
+    api = GraphAPI(access_token)
 
-# Obtendo a lista de amigos aniversariantes para a data especificada
-amigos_aniversariantes = obter_amigos_aniversariantes(data_aniversario)
+    try:
+        # Obter lista de amigos e suas datas de aniversário
+        amigos = api.get_connections(id='me', connection_name='friends')['data']
+    except Exception as e:
+        print(f"Erro ao obter lista de amigos: {e}")
+        return
 
-# Percorrendo a lista de amigos aniversariantes e enviando as mensagens de feliz aniversário
-for amigo in amigos_aniversariantes:
-    amigo_id = amigo["id"]
-    amigo_nome = amigo["name"]
-    frase_sorteada = random.choice(frases)
-    enviar_mensagem_aniversario(amigo_id, amigo_nome, frase_sorteada)
+    hoje = datetime.datetime.now().strftime('%m-%d')
+
+    # Carregar histórico de frases usadas
+    try:
+        with open('historico_frases.txt', 'r') as file:
+            historico_frases = file.read().splitlines()
+    except FileNotFoundError:
+        historico_frases = []
+
+    ultimas_frases = historico_frases[-14:]
+
+    for amigo in amigos:
+        aniversario = amigo.get('birthday')
+        if aniversario and aniversario[5:] == hoje:
+            frase = selecionar_frase(ultimas_frases)
+            mensagem = f"{frase} 🎉"
+            postar_mensagem(api, amigo, mensagem)
+            historico_frases.append(frase)
+
+    # Salvar histórico de frases usadas (mantendo apenas as últimas 14)
+    with open('historico_frases.txt', 'w') as file:
+        file.write('\n'.join(historico_frases[-14:]))
+
+# Executar a função principal
+desejar_feliz_aniversario()
